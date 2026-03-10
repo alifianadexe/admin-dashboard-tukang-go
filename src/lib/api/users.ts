@@ -129,3 +129,93 @@ export async function getUserStats(userId: string, role: 'client' | 'mitra') {
     averageRating: Math.round(averageRating * 10) / 10,
   };
 }
+
+// Partner Services Management
+export async function updatePartnerServices(userId: string, serviceIds: string[]) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ service_ids: serviceIds })
+    .eq('id', userId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function getPartnerServices(userId: string) {
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('service_ids')
+    .eq('id', userId)
+    .single();
+
+  if (profileError) throw profileError;
+
+  if (!profile.service_ids || profile.service_ids.length === 0) {
+    return [];
+  }
+
+  const { data: services, error: servicesError } = await supabase
+    .from('services')
+    .select('*')
+    .in('id', profile.service_ids);
+
+  if (servicesError) throw servicesError;
+  return services;
+}
+
+// Partner Referrals
+export async function getPartnerReferrals(userId: string) {
+  const { data, error } = await supabase
+    .from('partner_referrals')
+    .select(
+      `
+      *,
+      referrer:referrer_id(id, full_name, email, phone, referral_code),
+      referred:referred_id(id, full_name, email, phone, is_verified, created_at)
+    `
+    )
+    .eq('referrer_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data;
+}
+
+export async function getAllReferrals() {
+  const { data, error } = await supabase
+    .from('partner_referrals')
+    .select(
+      `
+      *,
+      referrer:referrer_id(id, full_name, email, phone, referral_code),
+      referred:referred_id(id, full_name, email, phone, is_verified, created_at)
+    `
+    )
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data;
+}
+
+export async function updateReferralBonus(
+  referralId: string,
+  bonusAmount: number,
+  bonusPaidAt?: string
+) {
+  const updates: any = { bonus_amount: bonusAmount };
+  if (bonusPaidAt) {
+    updates.bonus_paid_at = bonusPaidAt;
+  }
+
+  const { data, error } = await supabase
+    .from('partner_referrals')
+    .update(updates)
+    .eq('id', referralId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
