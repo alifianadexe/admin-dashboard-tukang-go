@@ -85,7 +85,7 @@ export async function updateUserStatus(
 ) {
   const { data, error } = await supabase
     .from('profiles')
-    .update(updates)
+    .update(updates as never)
     .eq('id', userId)
     .select()
     .single();
@@ -104,18 +104,27 @@ export async function getUserStats(userId: string, role: 'client' | 'mitra') {
 
   if (error) throw error;
 
-  const totalOrders = orders?.length || 0;
-  const completedOrders = orders?.filter(o => o.status === 'completed').length || 0;
+  const typedOrders = (orders ?? []) as Array<{
+    status: string;
+    price_total: number;
+    commission_amount: number;
+    rating: number | null;
+  }>;
+
+  const totalOrders = typedOrders.length;
+  const completedOrders = typedOrders.filter(o => o.status === 'completed').length;
   const totalSpent =
-    orders?.filter(o => o.status === 'completed').reduce((sum, o) => sum + o.price_total, 0) || 0;
+    typedOrders
+      .filter(o => o.status === 'completed')
+      .reduce((sum, o) => sum + o.price_total, 0);
   const totalEarnings =
     role === 'mitra'
-      ? orders
+      ? typedOrders
           ?.filter(o => o.status === 'completed')
           .reduce((sum, o) => sum + (o.price_total - o.commission_amount), 0) || 0
       : 0;
 
-  const ratingsData = orders?.filter(o => o.rating !== null);
+  const ratingsData = typedOrders.filter(o => o.rating !== null);
   const averageRating =
     ratingsData && ratingsData.length > 0
       ? ratingsData.reduce((sum, o) => sum + (o.rating || 0), 0) / ratingsData.length
@@ -134,7 +143,7 @@ export async function getUserStats(userId: string, role: 'client' | 'mitra') {
 export async function updatePartnerServices(userId: string, serviceIds: string[]) {
   const { data, error } = await supabase
     .from('profiles')
-    .update({ service_ids: serviceIds })
+    .update({ service_ids: serviceIds } as never)
     .eq('id', userId)
     .select()
     .single();
@@ -152,14 +161,16 @@ export async function getPartnerServices(userId: string) {
 
   if (profileError) throw profileError;
 
-  if (!profile.service_ids || profile.service_ids.length === 0) {
+  const typedProfile = (profile ?? { service_ids: [] }) as { service_ids: string[] | null };
+
+  if (!typedProfile.service_ids || typedProfile.service_ids.length === 0) {
     return [];
   }
 
   const { data: services, error: servicesError } = await supabase
     .from('services')
     .select('*')
-    .in('id', profile.service_ids);
+    .in('id', typedProfile.service_ids);
 
   if (servicesError) throw servicesError;
   return services;
@@ -211,7 +222,7 @@ export async function updateReferralBonus(
 
   const { data, error } = await supabase
     .from('partner_referrals')
-    .update(updates)
+    .update(updates as never)
     .eq('id', referralId)
     .select()
     .single();

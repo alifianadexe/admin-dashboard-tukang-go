@@ -26,7 +26,11 @@ export async function createService(service: {
   commission_percentage: number;
   is_active?: boolean;
 }) {
-  const { data, error } = await supabase.from('services').insert(service).select().single();
+  const { data, error } = await supabase
+    .from('services')
+    .insert(service as never)
+    .select()
+    .single();
 
   if (error) throw error;
   return data as Service;
@@ -45,7 +49,7 @@ export async function updateService(
 ) {
   const { data, error } = await supabase
     .from('services')
-    .update(updates)
+    .update(updates as never)
     .eq('id', serviceId)
     .select()
     .single();
@@ -68,12 +72,17 @@ export async function getServiceStats(serviceId: string) {
 
   if (error) throw error;
 
-  const totalOrders = orders?.length || 0;
-  const completedOrders = orders?.filter(o => o.status === 'completed').length || 0;
+  const typedOrders =
+    (orders ?? []) as Array<{ status: string; price_total: number; commission_amount: number }>;
+
+  const totalOrders = typedOrders.length;
+  const completedOrders = typedOrders.filter(o => o.status === 'completed').length;
   const totalRevenue =
-    orders?.filter(o => o.status === 'completed').reduce((sum, o) => sum + o.price_total, 0) || 0;
+    typedOrders
+      .filter(o => o.status === 'completed')
+      .reduce((sum, o) => sum + o.price_total, 0);
   const totalCommission =
-    orders
+    typedOrders
       ?.filter(o => o.status === 'completed')
       .reduce((sum, o) => sum + o.commission_amount, 0) || 0;
 

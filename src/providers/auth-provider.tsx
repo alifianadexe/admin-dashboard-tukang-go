@@ -57,14 +57,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error) throw error;
 
+      const profileData = data as Profile | null;
+      if (!profileData) {
+        setProfile(null);
+        return;
+      }
+
       // Only allow admin users
-      if (data.role !== 'admin') {
+      if (profileData.role !== 'admin') {
         await supabase.auth.signOut();
         setProfile(null);
         setUser(null);
         setSession(null);
       } else {
-        setProfile(data);
+        setProfile(profileData);
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -91,7 +97,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (profileError) throw profileError;
 
-      if (profileData.role !== 'admin') {
+      const roleData = profileData as { role?: string } | null;
+
+      if (roleData?.role !== 'admin') {
         await supabase.auth.signOut();
         throw new Error('Access denied. Admin privileges required.');
       }

@@ -16,6 +16,10 @@ import {
   endOfDay,
 } from 'date-fns';
 
+type DashboardOrderMetrics = Pick<Order, 'status' | 'price_total' | 'commission_amount' | 'rating'>;
+type RevenueOrderMetrics = Pick<Order, 'price_total' | 'commission_amount' | 'completed_at'>;
+type ServiceOrderMetrics = Pick<Order, 'service_id' | 'price_total'>;
+
 export async function getDashboardStats(): Promise<DashboardStats> {
   const now = new Date();
   const startOfCurrentMonth = startOfMonth(now);
@@ -28,13 +32,15 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
   if (ordersError) throw ordersError;
 
-  const totalOrders = orders?.length || 0;
-  const completedOrders = orders?.filter(o => o.status === 'completed').length || 0;
-  const activeOrders =
-    orders?.filter(o => !['completed', 'cancelled'].includes(o.status)).length || 0;
-  const cancelledOrders = orders?.filter(o => o.status === 'cancelled').length || 0;
+  const typedOrders = (orders ?? []) as DashboardOrderMetrics[];
 
-  const completedOrdersData = orders?.filter(o => o.status === 'completed') || [];
+  const totalOrders = typedOrders.length;
+  const completedOrders = typedOrders.filter(o => o.status === 'completed').length;
+  const activeOrders =
+    typedOrders.filter(o => !['completed', 'cancelled'].includes(o.status)).length;
+  const cancelledOrders = typedOrders.filter(o => o.status === 'cancelled').length;
+
+  const completedOrdersData = typedOrders.filter(o => o.status === 'completed');
   const totalRevenue = completedOrdersData.reduce((sum, o) => sum + (o.price_total || 0), 0);
   const totalCommission = completedOrdersData.reduce(
     (sum, o) => sum + (o.commission_amount || 0),
@@ -62,9 +68,12 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
   if (mitraError) throw mitraError;
 
-  const totalClients = clients?.length || 0;
-  const totalMitra = mitra?.length || 0;
-  const activeMitra = mitra?.filter(m => m.is_active).length || 0;
+  const typedClients = (clients ?? []) as Array<{ id: string }>;
+  const typedMitra = (mitra ?? []) as Array<{ id: string; is_active: boolean }>;
+
+  const totalClients = typedClients.length;
+  const totalMitra = typedMitra.length;
+  const activeMitra = typedMitra.filter(m => m.is_active).length;
 
   return {
     totalOrders,
@@ -93,6 +102,8 @@ export async function getRevenueChartData(days: number = 30): Promise<RevenueCha
 
   if (error) throw error;
 
+  const typedOrders = (orders ?? []) as RevenueOrderMetrics[];
+
   // Group by date
   const dateRange = eachDayOfInterval({ start: startDate, end: endDate });
 
@@ -101,10 +112,10 @@ export async function getRevenueChartData(days: number = 30): Promise<RevenueCha
     const dayEnd = endOfDay(date);
 
     const dayOrders =
-      orders?.filter(o => {
+      typedOrders.filter(o => {
         const completedAt = new Date(o.completed_at!);
         return completedAt >= dayStart && completedAt <= dayEnd;
-      }) || [];
+      });
 
     return {
       date: format(date, 'MMM dd'),
@@ -120,8 +131,10 @@ export async function getOrdersByStatus(): Promise<OrdersByStatusData[]> {
 
   if (error) throw error;
 
+  const typedOrders = (orders ?? []) as Pick<Order, 'status'>[];
+
   const statusCounts: Record<string, number> = {};
-  orders?.forEach(order => {
+  typedOrders.forEach(order => {
     statusCounts[order.status] = (statusCounts[order.status] || 0) + 1;
   });
 
@@ -160,15 +173,19 @@ export async function getTopServices(limit: number = 5): Promise<TopServicesData
 
   if (ordersError) throw ordersError;
 
+  const typedOrders = (orders ?? []) as ServiceOrderMetrics[];
+
   const { data: services, error: servicesError } = await supabase
     .from('services')
     .select('id, name');
 
   if (servicesError) throw servicesError;
 
+  const typedServices = (services ?? []) as Array<{ id: string; name: string }>;
+
   // Group orders by service
   const serviceStats: Record<string, { orders: number; revenue: number }> = {};
-  orders?.forEach(order => {
+  typedOrders.forEach(order => {
     if (!serviceStats[order.service_id]) {
       serviceStats[order.service_id] = { orders: 0, revenue: 0 };
     }
@@ -177,7 +194,7 @@ export async function getTopServices(limit: number = 5): Promise<TopServicesData
   });
 
   // Map to service names and sort
-  const servicesMap = new Map(services?.map(s => [s.id, s.name]));
+  const servicesMap = new Map(typedServices.map(s => [s.id, s.name]));
 
   return Object.entries(serviceStats)
     .map(([serviceId, stats]) => ({

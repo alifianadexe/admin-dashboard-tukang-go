@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { Order, OrderStatus } from '@/types/database';
+import { Database, Order, OrderStatus } from '@/types/database';
 
 export interface OrdersFilter {
   status?: OrderStatus | 'all';
@@ -68,7 +68,7 @@ export async function getOrderById(orderId: string) {
 }
 
 export async function updateOrderStatus(orderId: string, status: OrderStatus) {
-  const updates: Record<string, any> = { status };
+  const updates: Database['public']['Tables']['orders']['Update'] = { status };
 
   if (status === 'completed') {
     updates.completed_at = new Date().toISOString();
@@ -76,7 +76,7 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus) {
 
   const { data, error } = await supabase
     .from('orders')
-    .update(updates)
+    .update(updates as never)
     .eq('id', orderId)
     .select()
     .single();
@@ -86,12 +86,14 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus) {
 }
 
 export async function cancelOrder(orderId: string, reason?: string) {
+  const updates: Database['public']['Tables']['orders']['Update'] = {
+    status: 'cancelled',
+    notes: reason,
+  };
+
   const { data, error } = await supabase
     .from('orders')
-    .update({
-      status: 'cancelled',
-      notes: reason,
-    })
+    .update(updates as never)
     .eq('id', orderId)
     .select()
     .single();

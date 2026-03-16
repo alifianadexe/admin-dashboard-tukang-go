@@ -215,7 +215,11 @@ export default function DashboardPage() {
                     tickFormatter={value => `${(value / 1000000).toFixed(1)}M`}
                   />
                   <Tooltip
-                    formatter={(value: number) => formatCurrency(value)}
+                    formatter={value => {
+                      const numericValue = typeof value === 'number' ? value : Number(value ?? 0);
+                      const safeValue = Number.isFinite(numericValue) ? numericValue : 0;
+                      return formatCurrency(safeValue);
+                    }}
                     labelFormatter={label => `Date: ${label}`}
                   />
                   <Legend />
@@ -260,7 +264,7 @@ export default function DashboardPage() {
                     paddingAngle={2}
                     dataKey="count"
                     nameKey="status"
-                    label={({ status, count }) => `${status}: ${count}`}
+                    label={props => `${String(props.name ?? '')}: ${props.value ?? 0}`}
                     labelLine={false}
                   >
                     {ordersByStatus?.map((entry, index) => (
@@ -293,9 +297,16 @@ export default function DashboardPage() {
                   <XAxis type="number" fontSize={12} />
                   <YAxis dataKey="name" type="category" fontSize={12} width={100} />
                   <Tooltip
-                    formatter={(value: number, name: string) =>
-                      name === 'revenue' ? formatCurrency(value) : value
-                    }
+                    formatter={(value, name) => {
+                      if (name === 'revenue') {
+                        const numericValue =
+                          typeof value === 'number' ? value : Number(value ?? 0);
+                        const safeValue = Number.isFinite(numericValue) ? numericValue : 0;
+                        return formatCurrency(safeValue);
+                      }
+
+                      return typeof value === 'number' ? value : Number(value ?? 0);
+                    }}
                   />
                   <Bar dataKey="orders" fill="#f97316" name="Orders" />
                 </BarChart>

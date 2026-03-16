@@ -11,6 +11,14 @@ import {
   startOfYear,
   endOfYear,
 } from 'date-fns';
+import type { Profile, WalletTransaction } from '@/types/database';
+
+type FinanceOrderMetrics = {
+  price_total: number;
+  commission_amount: number;
+  completed_at: string | null;
+  payment_method?: string | null;
+};
 
 export interface FinanceStats {
   totalRevenue: number;
@@ -66,17 +74,26 @@ export async function getFinanceStats(): Promise<FinanceStats> {
 
   if (withdrawalError) throw withdrawalError;
 
-  // Calculate stats
-  const totalRevenue = allOrders?.reduce((sum, o) => sum + o.price_total, 0) || 0;
-  const totalCommission = allOrders?.reduce((sum, o) => sum + o.commission_amount, 0) || 0;
-  const totalPayouts = withdrawals?.reduce((sum, t) => sum + Math.abs(t.amount), 0) || 0;
+  const typedAllOrders = (allOrders ?? []) as FinanceOrderMetrics[];
+  const typedCurrentMonthOrders = (currentMonthOrders ?? []) as FinanceOrderMetrics[];
+  const typedLastMonthOrders = (lastMonthOrders ?? []) as FinanceOrderMetrics[];
+  const typedWithdrawals = (withdrawals ?? []) as Array<Pick<WalletTransaction, 'amount'>>;
 
-  const monthlyRevenue = currentMonthOrders?.reduce((sum, o) => sum + o.price_total, 0) || 0;
-  const monthlyCommission =
-    currentMonthOrders?.reduce((sum, o) => sum + o.commission_amount, 0) || 0;
-  const lastMonthRevenue = lastMonthOrders?.reduce((sum, o) => sum + o.price_total, 0) || 0;
-  const lastMonthCommission =
-    lastMonthOrders?.reduce((sum, o) => sum + o.commission_amount, 0) || 0;
+  // Calculate stats
+  const totalRevenue = typedAllOrders.reduce((sum, o) => sum + o.price_total, 0);
+  const totalCommission = typedAllOrders.reduce((sum, o) => sum + o.commission_amount, 0);
+  const totalPayouts = typedWithdrawals.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+
+  const monthlyRevenue = typedCurrentMonthOrders.reduce((sum, o) => sum + o.price_total, 0);
+  const monthlyCommission = typedCurrentMonthOrders.reduce(
+    (sum, o) => sum + o.commission_amount,
+    0
+  );
+  const lastMonthRevenue = typedLastMonthOrders.reduce((sum, o) => sum + o.price_total, 0);
+  const lastMonthCommission = typedLastMonthOrders.reduce(
+    (sum, o) => sum + o.commission_amount,
+    0
+  );
 
   const revenueGrowth =
     lastMonthRevenue > 0 ? ((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;
@@ -93,7 +110,9 @@ export async function getFinanceStats(): Promise<FinanceStats> {
 
   if (mitraError) throw mitraError;
 
-  const pendingPayouts = mitraProfiles?.reduce((sum, p) => sum + (p.wallet_balance || 0), 0) || 0;
+  const typedMitraProfiles = (mitraProfiles ?? []) as Array<Pick<Profile, 'wallet_balance'>>;
+
+  const pendingPayouts = typedMitraProfiles.reduce((sum, p) => sum + (p.wallet_balance || 0), 0);
 
   return {
     totalRevenue,
@@ -128,6 +147,8 @@ export async function getMonthlyRevenueData(months: number = 12): Promise<Monthl
 
   if (error) throw error;
 
+  const typedOrders = (orders ?? []) as FinanceOrderMetrics[];
+
   // Group by month
   const monthRange = eachMonthOfInterval({ start: startDate, end: endDate });
 
@@ -136,10 +157,10 @@ export async function getMonthlyRevenueData(months: number = 12): Promise<Monthl
     const monthEnd = endOfMonth(date);
 
     const monthOrders =
-      orders?.filter(o => {
+      typedOrders.filter(o => {
         const completedAt = new Date(o.completed_at!);
         return completedAt >= monthStart && completedAt <= monthEnd;
-      }) || [];
+      });
 
     return {
       month: format(date, 'MMM yyyy'),
@@ -156,6 +177,10 @@ export interface PaymentMethodData {
   amount: number;
 }
 
+export type RecentTransaction = WalletTransaction & {
+  user: Pick<Profile, 'full_name' | 'role'> | null;
+};
+
 export async function getPaymentMethodStats(): Promise<PaymentMethodData[]> {
   const { data: orders, error } = await supabase
     .from('orders')
@@ -165,9 +190,11 @@ export async function getPaymentMethodStats(): Promise<PaymentMethodData[]> {
 
   if (error) throw error;
 
+  const typedOrders = (orders ?? []) as FinanceOrderMetrics[];
+
   const methodStats: Record<string, { count: number; amount: number }> = {};
 
-  orders?.forEach(order => {
+  typedOrders.forEach(order => {
     const method = order.payment_method || 'unknown';
     if (!methodStats[method]) {
       methodStats[method] = { count: 0, amount: 0 };
@@ -189,7 +216,7 @@ export async function getPaymentMethodStats(): Promise<PaymentMethodData[]> {
   }));
 }
 
-export async function getRecentTransactions(limit: number = 20) {
+export async function getRecentTransactions(limit: number = 20): Promise<RecentTransaction[]> {
   const { data, error } = await supabase
     .from('wallet_transactions')
     .select('*, user:profiles(full_name, role)')
@@ -197,5 +224,5 @@ export async function getRecentTransactions(limit: number = 20) {
     .limit(limit);
 
   if (error) throw error;
-  return data;
+  return (data ?? []) as RecentTransaction[];
 }

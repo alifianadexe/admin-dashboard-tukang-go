@@ -35,6 +35,7 @@ import {
 import { format } from 'date-fns';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import type { Profile } from '@/types/database';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('id-ID', {
@@ -54,7 +55,7 @@ export default function PartnerDetailPage() {
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [savingServices, setSavingServices] = useState(false);
 
-  const { data: partner, isLoading: partnerLoading } = useQuery({
+  const { data: partner, isLoading: partnerLoading } = useQuery<Profile>({
     queryKey: ['user', userId],
     queryFn: () => getUserById(userId),
   });
@@ -218,7 +219,7 @@ export default function PartnerDetailPage() {
                   <div className="flex items-center gap-1">
                     <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
                     <span className="text-xl font-bold">
-                      {partner.rating_avg?.toFixed(1) || 'N/A'}
+                      {partner.rating?.toFixed(1) || 'N/A'}
                     </span>
                   </div>
                 </div>
@@ -232,7 +233,15 @@ export default function PartnerDetailPage() {
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Referral Code</p>
-                  <p className="text-xl font-bold font-mono">{partner.referral_code || 'N/A'}</p>
+                  <p className="text-xl font-bold font-mono">
+                    {
+                      (
+                        partner as Profile & {
+                          referral_code?: string | null;
+                        }
+                      ).referral_code || 'N/A'
+                    }
+                  </p>
                 </div>
               </div>
             </div>

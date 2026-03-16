@@ -225,10 +225,14 @@ export default function FinancePage() {
                     tickFormatter={value => `${(value / 1000000).toFixed(0)}M`}
                   />
                   <Tooltip
-                    formatter={(value: number, name: string) => [
-                      formatCurrency(value),
-                      name === 'revenue' ? 'Revenue' : 'Commission',
-                    ]}
+                    formatter={(value, name) => {
+                      const numericValue = typeof value === 'number' ? value : Number(value ?? 0);
+                      const safeValue = Number.isFinite(numericValue) ? numericValue : 0;
+                      return [
+                        formatCurrency(safeValue),
+                        name === 'revenue' ? 'Revenue' : 'Commission',
+                      ];
+                    }}
                   />
                   <Legend />
                   <Bar dataKey="revenue" fill="#f97316" name="Revenue" />
@@ -267,10 +271,19 @@ export default function FinancePage() {
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(value: number, name: string, props: any) => [
-                        `${value} orders (${formatCurrency(props.payload.amount)})`,
-                        props.payload.method,
-                      ]}
+                      formatter={(value, _name, item) => {
+                        const count = typeof value === 'number' ? value : Number(value ?? 0);
+                        const safeCount = Number.isFinite(count) ? count : 0;
+                        const payload = (item as { payload?: { amount?: number; method?: string } })
+                          ?.payload;
+                        const amount = Number(payload?.amount ?? 0);
+                        const safeAmount = Number.isFinite(amount) ? amount : 0;
+
+                        return [
+                          `${safeCount} orders (${formatCurrency(safeAmount)})`,
+                          payload?.method ?? 'Unknown',
+                        ];
+                      }}
                     />
                   </PieChart>
                 </ResponsiveContainer>
