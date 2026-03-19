@@ -1,50 +1,52 @@
-import { supabase } from '@/lib/supabase';
-import { Profile } from '@/types/database';
+import { supabase } from "@/lib/supabase";
+import type { Profile, ProfileDetails } from "@/types/database";
 
 export interface UsersFilter {
-  role?: 'client' | 'mitra' | 'all';
+  role?: "client" | "mitra" | "all";
   search?: string;
-  isActive?: boolean | 'all';
-  isVerified?: boolean | 'all';
+  isActive?: boolean | "all";
+  isVerified?: boolean | "all";
   page?: number;
   limit?: number;
 }
 
 export async function getUsers(filter: UsersFilter = {}) {
   const {
-    role = 'all',
+    role = "all",
     search,
-    isActive = 'all',
-    isVerified = 'all',
+    isActive = "all",
+    isVerified = "all",
     page = 1,
     limit = 20,
   } = filter;
 
-  let query = supabase.from('profiles').select('*', { count: 'exact' });
+  let query = supabase.from("profiles").select("*", { count: "exact" });
 
-  if (role !== 'all') {
-    query = query.eq('role', role);
+  if (role !== "all") {
+    query = query.eq("role", role);
   } else {
-    query = query.in('role', ['client', 'mitra']);
+    query = query.in("role", ["client", "mitra"]);
   }
 
   if (search) {
-    query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`);
+    query = query.or(
+      `full_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`,
+    );
   }
 
-  if (isActive !== 'all') {
-    query = query.eq('is_active', isActive);
+  if (isActive !== "all") {
+    query = query.eq("is_active", isActive);
   }
 
-  if (isVerified !== 'all') {
-    query = query.eq('is_verified', isVerified);
+  if (isVerified !== "all") {
+    query = query.eq("is_verified", isVerified);
   }
 
   const from = (page - 1) * limit;
   const to = from + limit - 1;
 
   const { data, error, count } = await query
-    .order('created_at', { ascending: false })
+    .order("created_at", { ascending: false })
     .range(from, to);
 
   if (error) throw error;
@@ -59,20 +61,66 @@ export async function getUsers(filter: UsersFilter = {}) {
 }
 
 export async function getUserById(userId: string) {
-  const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .single();
 
   if (error) throw error;
   return data as Profile;
 }
 
-export async function getUserOrders(userId: string, role: 'client' | 'mitra') {
-  const column = role === 'client' ? 'client_id' : 'mitra_id';
+export type ProfileDetailsUpdate = Partial<
+  Omit<
+    ProfileDetails,
+    | "id"
+    | "profile_id"
+    | "created_at"
+    | "updated_at"
+    | "notification_preferences"
+    | "metadata"
+  >
+> & {
+  notification_preferences?: ProfileDetails["notification_preferences"];
+  metadata?: ProfileDetails["metadata"];
+};
+
+export async function getProfileDetails(userId: string) {
+  const { data, error } = await supabase
+    .from("profile_details")
+    .select("*")
+    .eq("profile_id", userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data as ProfileDetails | null;
+}
+
+export async function updateProfileDetails(
+  userId: string,
+  updates: ProfileDetailsUpdate,
+) {
+  const payload = { profile_id: userId, ...updates };
 
   const { data, error } = await supabase
-    .from('orders')
-    .select('*, service:services(name)')
+    .from("profile_details")
+    .upsert(payload as never, { onConflict: "profile_id" })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as ProfileDetails;
+}
+
+export async function getUserOrders(userId: string, role: "client" | "mitra") {
+  const column = role === "client" ? "client_id" : "mitra_id";
+
+  const { data, error } = await supabase
+    .from("orders")
+    .select("*, service:services(name)")
     .eq(column, userId)
-    .order('created_at', { ascending: false })
+    .order("created_at", { ascending: false })
     .limit(10);
 
   if (error) throw error;
@@ -81,12 +129,12 @@ export async function getUserOrders(userId: string, role: 'client' | 'mitra') {
 
 export async function updateUserStatus(
   userId: string,
-  updates: { is_active?: boolean; is_verified?: boolean }
+  updates: { is_active?: boolean; is_verified?: boolean },
 ) {
   const { data, error } = await supabase
-    .from('profiles')
+    .from("profiles")
     .update(updates as never)
-    .eq('id', userId)
+    .eq("id", userId)
     .select()
     .single();
 
@@ -94,12 +142,12 @@ export async function updateUserStatus(
   return data;
 }
 
-export async function getUserStats(userId: string, role: 'client' | 'mitra') {
-  const column = role === 'client' ? 'client_id' : 'mitra_id';
+export async function getUserStats(userId: string, role: "client" | "mitra") {
+  const column = role === "client" ? "client_id" : "mitra_id";
 
   const { data: orders, error } = await supabase
-    .from('orders')
-    .select('status, price_total, commission_amount, rating')
+    .from("orders")
+    .select("status, price_total, commission_amount, rating")
     .eq(column, userId);
 
   if (error) throw error;
@@ -112,22 +160,25 @@ export async function getUserStats(userId: string, role: 'client' | 'mitra') {
   }>;
 
   const totalOrders = typedOrders.length;
-  const completedOrders = typedOrders.filter(o => o.status === 'completed').length;
-  const totalSpent =
-    typedOrders
-      .filter(o => o.status === 'completed')
-      .reduce((sum, o) => sum + o.price_total, 0);
+  const completedOrders = typedOrders.filter(
+    (o) => o.status === "completed",
+  ).length;
+  const totalSpent = typedOrders
+    .filter((o) => o.status === "completed")
+    .reduce((sum, o) => sum + o.price_total, 0);
   const totalEarnings =
-    role === 'mitra'
+    role === "mitra"
       ? typedOrders
-          ?.filter(o => o.status === 'completed')
-          .reduce((sum, o) => sum + (o.price_total - o.commission_amount), 0) || 0
+          ?.filter((o) => o.status === "completed")
+          .reduce((sum, o) => sum + (o.price_total - o.commission_amount), 0) ||
+        0
       : 0;
 
-  const ratingsData = typedOrders.filter(o => o.rating !== null);
+  const ratingsData = typedOrders.filter((o) => o.rating !== null);
   const averageRating =
     ratingsData && ratingsData.length > 0
-      ? ratingsData.reduce((sum, o) => sum + (o.rating || 0), 0) / ratingsData.length
+      ? ratingsData.reduce((sum, o) => sum + (o.rating || 0), 0) /
+        ratingsData.length
       : 0;
 
   return {
@@ -140,11 +191,14 @@ export async function getUserStats(userId: string, role: 'client' | 'mitra') {
 }
 
 // Partner Services Management
-export async function updatePartnerServices(userId: string, serviceIds: string[]) {
+export async function updatePartnerServices(
+  userId: string,
+  serviceIds: string[],
+) {
   const { data, error } = await supabase
-    .from('profiles')
+    .from("profiles")
     .update({ service_ids: serviceIds } as never)
-    .eq('id', userId)
+    .eq("id", userId)
     .select()
     .single();
 
@@ -154,23 +208,25 @@ export async function updatePartnerServices(userId: string, serviceIds: string[]
 
 export async function getPartnerServices(userId: string) {
   const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('service_ids')
-    .eq('id', userId)
+    .from("profiles")
+    .select("service_ids")
+    .eq("id", userId)
     .single();
 
   if (profileError) throw profileError;
 
-  const typedProfile = (profile ?? { service_ids: [] }) as { service_ids: string[] | null };
+  const typedProfile = (profile ?? { service_ids: [] }) as {
+    service_ids: string[] | null;
+  };
 
   if (!typedProfile.service_ids || typedProfile.service_ids.length === 0) {
     return [];
   }
 
   const { data: services, error: servicesError } = await supabase
-    .from('services')
-    .select('*')
-    .in('id', typedProfile.service_ids);
+    .from("services")
+    .select("*")
+    .in("id", typedProfile.service_ids);
 
   if (servicesError) throw servicesError;
   return services;
@@ -179,16 +235,16 @@ export async function getPartnerServices(userId: string) {
 // Partner Referrals
 export async function getPartnerReferrals(userId: string) {
   const { data, error } = await supabase
-    .from('partner_referrals')
+    .from("partner_referrals")
     .select(
       `
       *,
       referrer:referrer_id(id, full_name, email, phone, referral_code),
       referred:referred_id(id, full_name, email, phone, is_verified, created_at)
-    `
+    `,
     )
-    .eq('referrer_id', userId)
-    .order('created_at', { ascending: false });
+    .eq("referrer_id", userId)
+    .order("created_at", { ascending: false });
 
   if (error) throw error;
   return data;
@@ -196,15 +252,15 @@ export async function getPartnerReferrals(userId: string) {
 
 export async function getAllReferrals() {
   const { data, error } = await supabase
-    .from('partner_referrals')
+    .from("partner_referrals")
     .select(
       `
       *,
       referrer:referrer_id(id, full_name, email, phone, referral_code),
       referred:referred_id(id, full_name, email, phone, is_verified, created_at)
-    `
+    `,
     )
-    .order('created_at', { ascending: false });
+    .order("created_at", { ascending: false });
 
   if (error) throw error;
   return data;
@@ -213,7 +269,7 @@ export async function getAllReferrals() {
 export async function updateReferralBonus(
   referralId: string,
   bonusAmount: number,
-  bonusPaidAt?: string
+  bonusPaidAt?: string,
 ) {
   const updates: any = { bonus_amount: bonusAmount };
   if (bonusPaidAt) {
@@ -221,9 +277,9 @@ export async function updateReferralBonus(
   }
 
   const { data, error } = await supabase
-    .from('partner_referrals')
+    .from("partner_referrals")
     .update(updates as never)
-    .eq('id', referralId)
+    .eq("id", referralId)
     .select()
     .single();
 

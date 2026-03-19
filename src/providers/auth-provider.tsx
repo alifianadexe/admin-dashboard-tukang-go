@@ -1,9 +1,15 @@
-'use client';
+"use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
-import { Profile } from '@/types/database';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from "react";
+import { User, Session } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
+import { Profile } from "@/types/database";
 
 interface AuthContextType {
   user: User | null;
@@ -53,7 +59,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
 
       if (error) throw error;
 
@@ -64,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // Only allow admin users
-      if (profileData.role !== 'admin') {
+      if (profileData.role !== "admin") {
         await supabase.auth.signOut();
         setProfile(null);
         setUser(null);
@@ -73,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(profileData);
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      console.error("Error fetching profile:", error);
     } finally {
       setLoading(false);
     }
@@ -90,18 +100,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Check if user is admin
       const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', data.user.id)
+        .from("profiles")
+        .select("role")
+        .eq("id", data.user.id)
         .single();
 
       if (profileError) throw profileError;
 
       const roleData = profileData as { role?: string } | null;
 
-      if (roleData?.role !== 'admin') {
+      if (roleData?.role !== "admin") {
         await supabase.auth.signOut();
-        throw new Error('Access denied. Admin privileges required.');
+        throw new Error("Access denied. Admin privileges required.");
       }
 
       return { error: null };
@@ -118,7 +128,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, session, loading, signIn, signOut }}>
+    <AuthContext.Provider
+      value={{ user, profile, session, loading, signIn, signOut }}
+    >
       {children}
     </AuthContext.Provider>
   );
@@ -127,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }

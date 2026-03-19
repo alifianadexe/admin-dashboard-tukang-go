@@ -8,7 +8,7 @@ export type Database = {
           email: string;
           full_name: string | null;
           phone: string | null;
-          role: 'client' | 'mitra' | 'admin';
+          role: "client" | "mitra" | "admin";
           avatar_url: string | null;
           is_verified: boolean;
           is_active: boolean;
@@ -18,8 +18,54 @@ export type Database = {
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'created_at' | 'updated_at'>;
-        Update: Partial<Database['public']['Tables']['profiles']['Insert']>;
+        Insert: Omit<
+          Database["public"]["Tables"]["profiles"]["Row"],
+          "created_at" | "updated_at"
+        >;
+        Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
+      };
+      profile_details: {
+        Row: {
+          id: string;
+          profile_id: string;
+          date_of_birth: string | null;
+          gender: "male" | "female" | "other" | "prefer_not_to_say" | null;
+          bio: string | null;
+          identity_type: string | null;
+          identity_number: string | null;
+          identity_verified: boolean;
+          emergency_contact_name: string | null;
+          emergency_contact_phone: string | null;
+          emergency_contact_relation: string | null;
+          preferred_language: string;
+          theme_preference: "light" | "dark" | "system";
+          notification_preferences: {
+            order_updates?: boolean;
+            promo?: boolean;
+            chat?: boolean;
+            system?: boolean;
+            [key: string]: boolean | undefined;
+          };
+          default_address_label: string | null;
+          default_address_detail: string | null;
+          years_experience: number | null;
+          service_area: string | null;
+          skills: string[] | null;
+          document_links: unknown[];
+          bank_account_name: string | null;
+          bank_name: string | null;
+          bank_account_number: string | null;
+          metadata: Record<string, unknown>;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["profile_details"]["Row"],
+          "id" | "created_at" | "updated_at"
+        >;
+        Update: Partial<
+          Database["public"]["Tables"]["profile_details"]["Insert"]
+        >;
       };
       services: {
         Row: {
@@ -34,10 +80,10 @@ export type Database = {
           updated_at: string;
         };
         Insert: Omit<
-          Database['public']['Tables']['services']['Row'],
-          'id' | 'created_at' | 'updated_at'
+          Database["public"]["Tables"]["services"]["Row"],
+          "id" | "created_at" | "updated_at"
         >;
-        Update: Partial<Database['public']['Tables']['services']['Insert']>;
+        Update: Partial<Database["public"]["Tables"]["services"]["Insert"]>;
       };
       orders: {
         Row: {
@@ -66,48 +112,53 @@ export type Database = {
           completed_at: string | null;
         };
         Insert: Omit<
-          Database['public']['Tables']['orders']['Row'],
-          'id' | 'order_no' | 'created_at'
+          Database["public"]["Tables"]["orders"]["Row"],
+          "id" | "order_no" | "created_at"
         >;
-        Update: Partial<Database['public']['Tables']['orders']['Insert']>;
+        Update: Partial<Database["public"]["Tables"]["orders"]["Insert"]>;
       };
       wallet_transactions: {
         Row: {
           id: string;
           user_id: string;
           order_id: string | null;
-          type: 'topup' | 'payment' | 'earning' | 'withdrawal' | 'refund';
+          type: "topup" | "payment" | "earning" | "withdrawal" | "refund";
           amount: number;
           description: string | null;
           created_at: string;
         };
         Insert: Omit<
-          Database['public']['Tables']['wallet_transactions']['Row'],
-          'id' | 'created_at'
+          Database["public"]["Tables"]["wallet_transactions"]["Row"],
+          "id" | "created_at"
         >;
-        Update: Partial<Database['public']['Tables']['wallet_transactions']['Insert']>;
+        Update: Partial<
+          Database["public"]["Tables"]["wallet_transactions"]["Insert"]
+        >;
       };
     };
   };
 };
 
 export type OrderStatus =
-  | 'searching'
-  | 'accepted'
-  | 'arrived'
-  | 'in_progress'
-  | 'payment_pending'
-  | 'completed'
-  | 'cancelled';
+  | "searching"
+  | "accepted"
+  | "arrived"
+  | "in_progress"
+  | "payment_pending"
+  | "completed"
+  | "cancelled";
 
-export type Profile = Database['public']['Tables']['profiles']['Row'];
-export type Service = Database['public']['Tables']['services']['Row'];
-export type Order = Database['public']['Tables']['orders']['Row'] & {
+export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
+export type ProfileDetails =
+  Database["public"]["Tables"]["profile_details"]["Row"];
+export type Service = Database["public"]["Tables"]["services"]["Row"];
+export type Order = Database["public"]["Tables"]["orders"]["Row"] & {
   client?: Profile;
   mitra?: Profile;
   service?: Service;
 };
-export type WalletTransaction = Database['public']['Tables']['wallet_transactions']['Row'];
+export type WalletTransaction =
+  Database["public"]["Tables"]["wallet_transactions"]["Row"];
 
 // Dashboard Stats
 export interface DashboardStats {
