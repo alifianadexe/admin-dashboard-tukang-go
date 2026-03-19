@@ -10,6 +10,23 @@ export interface UsersFilter {
   limit?: number;
 }
 
+export interface CreatePartnerInput {
+  id: string;
+  full_name?: string | null;
+  email: string;
+  phone?: string | null;
+  is_active?: boolean;
+  is_verified?: boolean;
+}
+
+export interface UpdatePartnerInput {
+  full_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  is_active?: boolean;
+  is_verified?: boolean;
+}
+
 export async function getUsers(filter: UsersFilter = {}) {
   const {
     role = "all",
@@ -65,6 +82,43 @@ export async function getUserById(userId: string) {
     .from("profiles")
     .select("*")
     .eq("id", userId)
+    .single();
+
+  if (error) throw error;
+  return data as Profile;
+}
+
+export async function createPartner(input: CreatePartnerInput) {
+  const payload = {
+    id: input.id,
+    role: "mitra" as const,
+    full_name: input.full_name ?? null,
+    email: input.email,
+    phone: input.phone ?? null,
+    is_active: input.is_active ?? true,
+    is_verified: input.is_verified ?? false,
+  };
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .insert(payload as never)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as Profile;
+}
+
+export async function updatePartner(
+  userId: string,
+  updates: UpdatePartnerInput,
+) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .update(updates as never)
+    .eq("id", userId)
+    .eq("role", "mitra")
+    .select()
     .single();
 
   if (error) throw error;
