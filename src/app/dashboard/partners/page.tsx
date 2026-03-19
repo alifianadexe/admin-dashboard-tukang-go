@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  createPartner,
+  createPartnerAccount,
   getUsers,
   updatePartner,
   updateUserStatus,
@@ -64,7 +64,6 @@ import { format } from "date-fns";
 import Link from "next/link";
 
 type PartnerFormState = {
-  authUserId: string;
   fullName: string;
   email: string;
   phone: string;
@@ -73,7 +72,6 @@ type PartnerFormState = {
 };
 
 const initialPartnerForm: PartnerFormState = {
-  authUserId: "",
   fullName: "",
   email: "",
   phone: "",
@@ -118,25 +116,24 @@ export default function PartnersPage() {
 
   const createPartnerMutation = useMutation({
     mutationFn: () =>
-      createPartner({
-        id: partnerForm.authUserId.trim(),
+      createPartnerAccount({
         full_name: partnerForm.fullName.trim() || null,
         email: partnerForm.email.trim(),
         phone: partnerForm.phone.trim() || null,
         is_active: partnerForm.isActive,
         is_verified: partnerForm.isVerified,
       }),
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       setIsDialogOpen(false);
       setPartnerForm(initialPartnerForm);
-      alert("Partner added successfully");
+      alert(
+        `Partner added successfully. Temporary password: ${result.temporaryPassword}`,
+      );
     },
     onError: (error) => {
       console.error("Error creating partner:", error);
-      alert(
-        "Failed to add partner. Ensure the Auth User ID already exists in auth.users and is not yet in profiles.",
-      );
+      alert("Failed to add partner");
     },
   });
 
@@ -211,7 +208,6 @@ export default function PartnersPage() {
     setFormMode("edit");
     setEditingPartnerId(user.id);
     setPartnerForm({
-      authUserId: user.id,
       fullName: user.full_name || "",
       email: user.email || "",
       phone: user.phone || "",
@@ -223,11 +219,6 @@ export default function PartnersPage() {
 
   const handleSubmitPartner = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-
-    if (formMode === "add" && !partnerForm.authUserId.trim()) {
-      alert("Auth User ID is required to add partner");
-      return;
-    }
 
     if (!partnerForm.email.trim()) {
       alert("Email is required");
@@ -269,36 +260,16 @@ export default function PartnersPage() {
             </DialogTitle>
             <DialogDescription>
               {formMode === "add"
-                ? "Create a partner profile for an existing Auth user ID."
+                ? "Create a partner account automatically from email, name, and phone."
                 : "Update partner profile information."}
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmitPartner} className="space-y-4">
-            {formMode === "add" ? (
-              <div className="space-y-2">
-                <Label htmlFor="authUserId">Auth User ID</Label>
-                <Input
-                  id="authUserId"
-                  value={partnerForm.authUserId}
-                  onChange={(e) =>
-                    setPartnerForm((prev) => ({
-                      ...prev,
-                      authUserId: e.target.value,
-                    }))
-                  }
-                  placeholder="UUID from auth.users"
-                  required
-                />
-                <p className="text-xs text-muted-foreground">
-                  The user must already exist in Supabase Auth because
-                  profiles.id references auth.users.id.
-                </p>
-              </div>
-            ) : (
+            {formMode === "edit" && (
               <div className="space-y-2">
                 <Label>Auth User ID</Label>
-                <Input value={partnerForm.authUserId} readOnly disabled />
+                <Input value={editingPartnerId || ""} readOnly disabled />
               </div>
             )}
 

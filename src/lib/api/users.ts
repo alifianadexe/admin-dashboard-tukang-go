@@ -19,6 +19,14 @@ export interface CreatePartnerInput {
   is_verified?: boolean;
 }
 
+export interface CreatePartnerAccountInput {
+  full_name?: string | null;
+  email: string;
+  phone?: string | null;
+  is_active?: boolean;
+  is_verified?: boolean;
+}
+
 export interface UpdatePartnerInput {
   full_name?: string | null;
   email?: string | null;
@@ -107,6 +115,37 @@ export async function createPartner(input: CreatePartnerInput) {
 
   if (error) throw error;
   return data as Profile;
+}
+
+export async function createPartnerAccount(input: CreatePartnerAccountInput) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.access_token) {
+    throw new Error("Unauthorized. Please sign in again.");
+  }
+
+  const response = await fetch("/api/admin/partners", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify(input),
+  });
+
+  const payload = (await response.json()) as {
+    error?: string;
+    profile?: Profile;
+    temporaryPassword?: string;
+  };
+
+  if (!response.ok || !payload.profile) {
+    throw new Error(payload.error || "Failed to create partner account");
+  }
+
+  return payload;
 }
 
 export async function updatePartner(
