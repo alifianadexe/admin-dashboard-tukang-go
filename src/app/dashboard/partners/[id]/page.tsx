@@ -59,6 +59,7 @@ import {
 import { format } from "date-fns";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import Swal from "sweetalert2";
 import type { Profile, ProfileDetails } from "@/types/database";
 
 type PartnerDetailsFormState = {
@@ -275,11 +276,18 @@ export default function PartnerDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile-details", userId] });
-      alert("Profile details updated successfully!");
+      void Swal.fire({
+        icon: "success",
+        title: "Profile details updated",
+      });
     },
     onError: (error) => {
       console.error("Error updating profile details:", error);
-      alert("Failed to update profile details");
+      void Swal.fire({
+        icon: "error",
+        title: "Failed to update profile details",
+        text: error instanceof Error ? error.message : "Please try again.",
+      });
     },
   });
 
@@ -298,15 +306,18 @@ export default function PartnerDetailPage() {
       setIsReferralDialogOpen(false);
       setSelectedReferredPartnerId("");
       setSelectedReferrerId(userId);
-      alert("Referral relation saved successfully!");
+      void Swal.fire({
+        icon: "success",
+        title: "Referral relation saved",
+      });
     },
     onError: (error) => {
       console.error("Error saving referral relation:", error);
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Failed to save referral relation",
-      );
+      void Swal.fire({
+        icon: "error",
+        title: "Failed to save referral relation",
+        text: error instanceof Error ? error.message : "Please try again.",
+      });
     },
   });
 
@@ -319,15 +330,18 @@ export default function PartnerDetailPage() {
       });
       queryClient.invalidateQueries({ queryKey: ["referral-group", userId] });
       queryClient.invalidateQueries({ queryKey: ["referral-options", userId] });
-      alert("Referral relation removed successfully!");
+      void Swal.fire({
+        icon: "success",
+        title: "Referral relation removed",
+      });
     },
     onError: (error) => {
       console.error("Error removing referral relation:", error);
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Failed to remove referral relation",
-      );
+      void Swal.fire({
+        icon: "error",
+        title: "Failed to remove referral relation",
+        text: error instanceof Error ? error.message : "Please try again.",
+      });
     },
   });
 
@@ -348,11 +362,18 @@ export default function PartnerDetailPage() {
       setIsMoveSubtreeDialogOpen(false);
       setSelectedSubtreeRootId("");
       setSelectedSubtreeTargetParentId("none");
-      alert("Subtree moved successfully!");
+      void Swal.fire({
+        icon: "success",
+        title: "Subtree moved",
+      });
     },
     onError: (error) => {
       console.error("Error moving subtree:", error);
-      alert(error instanceof Error ? error.message : "Failed to move subtree");
+      void Swal.fire({
+        icon: "error",
+        title: "Failed to move subtree",
+        text: error instanceof Error ? error.message : "Please try again.",
+      });
     },
   });
 
@@ -368,10 +389,17 @@ export default function PartnerDetailPage() {
       await updatePartnerServices(userId, selectedServices);
       queryClient.invalidateQueries({ queryKey: ["partner-services", userId] });
       queryClient.invalidateQueries({ queryKey: ["user", userId] });
-      alert("Services updated successfully!");
+      void Swal.fire({
+        icon: "success",
+        title: "Services updated",
+      });
     } catch (error) {
       console.error("Error updating services:", error);
-      alert("Failed to update services");
+      void Swal.fire({
+        icon: "error",
+        title: "Failed to update services",
+        text: error instanceof Error ? error.message : "Please try again.",
+      });
     } finally {
       setSavingServices(false);
     }
@@ -396,12 +424,18 @@ export default function PartnerDetailPage() {
 
   const handleSaveReferralRelation = () => {
     if (!selectedReferredPartnerId) {
-      alert("Please select a referred partner.");
+      void Swal.fire({
+        icon: "warning",
+        title: "Please select a referred partner",
+      });
       return;
     }
 
     if (!selectedReferrerId) {
-      alert("Please select a referrer.");
+      void Swal.fire({
+        icon: "warning",
+        title: "Please select a referrer",
+      });
       return;
     }
 
@@ -455,12 +489,18 @@ export default function PartnerDetailPage() {
 
   const handleMoveSubtree = () => {
     if (!selectedSubtreeRootId) {
-      alert("Please select a subtree root partner.");
+      void Swal.fire({
+        icon: "warning",
+        title: "Please select a subtree root partner",
+      });
       return;
     }
 
     if (!selectedSubtreeTargetParentId) {
-      alert("Please select a target parent.");
+      void Swal.fire({
+        icon: "warning",
+        title: "Please select a target parent",
+      });
       return;
     }
 
@@ -469,7 +509,11 @@ export default function PartnerDetailPage() {
       selectedSubtreeTargetParentId !== "none" &&
       descendantIds.has(selectedSubtreeTargetParentId)
     ) {
-      alert("Target parent cannot be inside selected subtree.");
+      void Swal.fire({
+        icon: "warning",
+        title: "Invalid target parent",
+        text: "Target parent cannot be inside selected subtree.",
+      });
       return;
     }
 

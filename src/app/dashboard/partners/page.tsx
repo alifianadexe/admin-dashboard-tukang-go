@@ -62,6 +62,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
+import Swal from "sweetalert2";
 
 type PartnerFormState = {
   fullName: string;
@@ -127,13 +128,19 @@ export default function PartnersPage() {
       queryClient.invalidateQueries({ queryKey: ["users"] });
       setIsDialogOpen(false);
       setPartnerForm(initialPartnerForm);
-      alert(
-        `Partner added successfully. Temporary password: ${result.temporaryPassword}`,
-      );
+      void Swal.fire({
+        icon: "success",
+        title: "Partner added",
+        text: `Temporary password: ${result.temporaryPassword}`,
+      });
     },
     onError: (error) => {
       console.error("Error creating partner:", error);
-      alert("Failed to add partner");
+      void Swal.fire({
+        icon: "error",
+        title: "Failed to add partner",
+        text: error instanceof Error ? error.message : "Please try again.",
+      });
     },
   });
 
@@ -156,11 +163,18 @@ export default function PartnersPage() {
       setIsDialogOpen(false);
       setEditingPartnerId(null);
       setPartnerForm(initialPartnerForm);
-      alert("Partner updated successfully");
+      void Swal.fire({
+        icon: "success",
+        title: "Partner updated",
+      });
     },
     onError: (error) => {
       console.error("Error updating partner:", error);
-      alert("Failed to update partner");
+      void Swal.fire({
+        icon: "error",
+        title: "Failed to update partner",
+        text: error instanceof Error ? error.message : "Please try again.",
+      });
     },
   });
 
@@ -221,7 +235,10 @@ export default function PartnersPage() {
     e.preventDefault();
 
     if (!partnerForm.email.trim()) {
-      alert("Email is required");
+      void Swal.fire({
+        icon: "warning",
+        title: "Email is required",
+      });
       return;
     }
 

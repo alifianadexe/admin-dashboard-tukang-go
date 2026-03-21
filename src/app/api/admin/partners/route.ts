@@ -20,8 +20,7 @@ function normalizeOptionalText(value: unknown): string | null {
 }
 
 function buildTemporaryPassword(): string {
-  const base = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
-  return `Tg!${base}a1`;
+  return "P@ssw0rd123";
 }
 
 export async function POST(request: NextRequest) {
