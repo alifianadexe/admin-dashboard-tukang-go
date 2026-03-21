@@ -8,8 +8,12 @@ import {
   updateUserStatus,
   getPartnerServices,
   updatePartnerServices,
-  getPartnerReferrals,
+  getDirectReferredPartners,
+  getReferralGroupMembers,
+  getReferralPartnerOptions,
   getProfileDetails,
+  moveReferralSubtree,
+  upsertReferralRelation,
   updateProfileDetails,
 } from "@/lib/api/users";
 import { getServices } from "@/lib/api/services";
@@ -29,6 +33,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   ArrowLeft,
   Mail,
   Phone,
@@ -40,6 +52,9 @@ import {
   Users,
   Wrench,
   UserRound,
+  Plus,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
@@ -138,6 +153,18 @@ export default function PartnerDetailPage() {
   const [savingServices, setSavingServices] = useState(false);
   const [profileDetailsForm, setProfileDetailsForm] =
     useState<PartnerDetailsFormState>(initialProfileDetailsForm);
+  const [isReferralDialogOpen, setIsReferralDialogOpen] = useState(false);
+  const [referralDialogMode, setReferralDialogMode] = useState<"add" | "edit">(
+    "add",
+  );
+  const [isMoveSubtreeDialogOpen, setIsMoveSubtreeDialogOpen] = useState(false);
+  const [selectedReferredPartnerId, setSelectedReferredPartnerId] =
+    useState<string>("");
+  const [selectedReferrerId, setSelectedReferrerId] = useState<string>(userId);
+  const [selectedSubtreeRootId, setSelectedSubtreeRootId] =
+    useState<string>("");
+  const [selectedSubtreeTargetParentId, setSelectedSubtreeTargetParentId] =
+    useState<string>("none");
 
   const { data: partner, isLoading: partnerLoading } = useQuery<Profile>({
     queryKey: ["user", userId],
@@ -180,11 +207,25 @@ export default function PartnerDetailPage() {
     setProfileDetailsForm(mapProfileDetailsToForm(profileDetails ?? null));
   }, [profileDetails]);
 
-  const { data: referrals, isLoading: referralsLoading } = useQuery<any[]>({
-    queryKey: ["partner-referrals", userId],
-    queryFn: () => getPartnerReferrals(userId),
+  const { data: directReferrals, isLoading: referralsLoading } = useQuery({
+    queryKey: ["direct-referred-partners", userId],
+    queryFn: () => getDirectReferredPartners(userId),
     enabled: !!partner,
   });
+
+  const { data: referralGroup, isLoading: referralGroupLoading } = useQuery({
+    queryKey: ["referral-group", userId],
+    queryFn: () => getReferralGroupMembers(userId),
+    enabled: !!partner,
+  });
+
+  const { data: referralOptions, isLoading: referralOptionsLoading } = useQuery(
+    {
+      queryKey: ["referral-options", userId],
+      queryFn: () => getReferralPartnerOptions(userId),
+      enabled: !!partner,
+    },
+  );
 
   const verifyMutation = useMutation({
     mutationFn: (isVerified: boolean) =>
@@ -242,6 +283,79 @@ export default function PartnerDetailPage() {
     },
   });
 
+  const saveReferralMutation = useMutation({
+    mutationFn: () =>
+      upsertReferralRelation(
+        selectedReferredPartnerId,
+        selectedReferrerId === "none" ? null : selectedReferrerId,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["direct-referred-partners", userId],
+      });
+      queryClient.invalidateQueries({ queryKey: ["referral-group", userId] });
+      queryClient.invalidateQueries({ queryKey: ["referral-options", userId] });
+      setIsReferralDialogOpen(false);
+      setSelectedReferredPartnerId("");
+      setSelectedReferrerId(userId);
+      alert("Referral relation saved successfully!");
+    },
+    onError: (error) => {
+      console.error("Error saving referral relation:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to save referral relation",
+      );
+    },
+  });
+
+  const deleteReferralMutation = useMutation({
+    mutationFn: (referredPartnerId: string) =>
+      upsertReferralRelation(referredPartnerId, null),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["direct-referred-partners", userId],
+      });
+      queryClient.invalidateQueries({ queryKey: ["referral-group", userId] });
+      queryClient.invalidateQueries({ queryKey: ["referral-options", userId] });
+      alert("Referral relation removed successfully!");
+    },
+    onError: (error) => {
+      console.error("Error removing referral relation:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Failed to remove referral relation",
+      );
+    },
+  });
+
+  const moveSubtreeMutation = useMutation({
+    mutationFn: () =>
+      moveReferralSubtree(
+        selectedSubtreeRootId,
+        selectedSubtreeTargetParentId === "none"
+          ? null
+          : selectedSubtreeTargetParentId,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["direct-referred-partners", userId],
+      });
+      queryClient.invalidateQueries({ queryKey: ["referral-group", userId] });
+      queryClient.invalidateQueries({ queryKey: ["referral-options", userId] });
+      setIsMoveSubtreeDialogOpen(false);
+      setSelectedSubtreeRootId("");
+      setSelectedSubtreeTargetParentId("none");
+      alert("Subtree moved successfully!");
+    },
+    onError: (error) => {
+      console.error("Error moving subtree:", error);
+      alert(error instanceof Error ? error.message : "Failed to move subtree");
+    },
+  });
+
   const handleServiceToggle = (serviceId: string, checked: boolean) => {
     setSelectedServices((prev) =>
       checked ? [...prev, serviceId] : prev.filter((id) => id !== serviceId),
@@ -261,6 +375,105 @@ export default function PartnerDetailPage() {
     } finally {
       setSavingServices(false);
     }
+  };
+
+  const openAddReferralDialog = () => {
+    setReferralDialogMode("add");
+    setSelectedReferredPartnerId("");
+    setSelectedReferrerId(userId);
+    setIsReferralDialogOpen(true);
+  };
+
+  const openEditReferralDialog = (
+    referredPartnerId: string,
+    referrerId: string | null,
+  ) => {
+    setReferralDialogMode("edit");
+    setSelectedReferredPartnerId(referredPartnerId);
+    setSelectedReferrerId(referrerId || "none");
+    setIsReferralDialogOpen(true);
+  };
+
+  const handleSaveReferralRelation = () => {
+    if (!selectedReferredPartnerId) {
+      alert("Please select a referred partner.");
+      return;
+    }
+
+    if (!selectedReferrerId) {
+      alert("Please select a referrer.");
+      return;
+    }
+
+    saveReferralMutation.mutate();
+  };
+
+  const getDescendantIds = (rootId: string) => {
+    if (!referralGroup || referralGroup.length === 0) {
+      return new Set<string>();
+    }
+
+    const childrenByParent = new Map<string, string[]>();
+    for (const member of referralGroup) {
+      if (!member.referred_by) {
+        continue;
+      }
+
+      const children = childrenByParent.get(member.referred_by) ?? [];
+      children.push(member.id);
+      childrenByParent.set(member.referred_by, children);
+    }
+
+    const descendants = new Set<string>();
+    const queue = [rootId];
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (!current) {
+        continue;
+      }
+
+      const children = childrenByParent.get(current) ?? [];
+      for (const child of children) {
+        if (descendants.has(child)) {
+          continue;
+        }
+
+        descendants.add(child);
+        queue.push(child);
+      }
+    }
+
+    return descendants;
+  };
+
+  const openMoveSubtreeDialog = () => {
+    setSelectedSubtreeRootId(userId);
+    setSelectedSubtreeTargetParentId("none");
+    setIsMoveSubtreeDialogOpen(true);
+  };
+
+  const handleMoveSubtree = () => {
+    if (!selectedSubtreeRootId) {
+      alert("Please select a subtree root partner.");
+      return;
+    }
+
+    if (!selectedSubtreeTargetParentId) {
+      alert("Please select a target parent.");
+      return;
+    }
+
+    const descendantIds = getDescendantIds(selectedSubtreeRootId);
+    if (
+      selectedSubtreeTargetParentId !== "none" &&
+      descendantIds.has(selectedSubtreeTargetParentId)
+    ) {
+      alert("Target parent cannot be inside selected subtree.");
+      return;
+    }
+
+    moveSubtreeMutation.mutate();
   };
 
   if (partnerLoading) {
@@ -744,72 +957,306 @@ export default function PartnerDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Referrals */}
+        {/* Referral Group Management */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Referred Partners
-            </CardTitle>
-            <CardDescription>
-              Partners referred by {partner.full_name}
-            </CardDescription>
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Referral Group
+                </CardTitle>
+                <CardDescription>
+                  Grouped referral chain and direct referral management
+                </CardDescription>
+              </div>
+              <Button size="sm" onClick={openAddReferralDialog}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={openMoveSubtreeDialog}
+              >
+                Move Subtree
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
-            {referralsLoading ? (
-              <div className="space-y-2">
-                {[...Array(3)].map((_, i) => (
-                  <Skeleton key={i} className="h-16 w-full" />
-                ))}
-              </div>
-            ) : referrals && referrals.length > 0 ? (
-              <div className="space-y-3 max-h-100 overflow-y-auto">
-                {referrals.map((referral) => (
-                  <div
-                    key={referral.id}
-                    className="flex items-center gap-3 p-3 rounded-lg border"
-                  >
-                    <Avatar>
-                      <AvatarFallback className="bg-orange-500 text-white">
-                        {referral.referred?.full_name?.[0] || "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <p className="font-medium">
-                        {referral.referred?.full_name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {referral.referred?.email}
-                      </p>
-                    </div>
-                    <div className="text-right text-xs">
-                      <Badge
-                        variant={
-                          referral.referred?.is_verified
-                            ? "default"
-                            : "secondary"
-                        }
-                        className={
-                          referral.referred?.is_verified ? "bg-green-500" : ""
-                        }
-                      >
-                        {referral.referred?.is_verified
-                          ? "Verified"
-                          : "Pending"}
-                      </Badge>
-                      <p className="text-muted-foreground mt-1">
-                        {format(new Date(referral.created_at), "MMM dd, yyyy")}
-                      </p>
-                    </div>
+            <Dialog
+              open={isReferralDialogOpen}
+              onOpenChange={setIsReferralDialogOpen}
+            >
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>
+                    {referralDialogMode === "add"
+                      ? "Add Referred Partner"
+                      : "Edit Referral Relation"}
+                  </DialogTitle>
+                  <DialogDescription>
+                    Manage referral links between partner accounts.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="referredPartner">Referred Partner</Label>
+                    <select
+                      id="referredPartner"
+                      value={selectedReferredPartnerId}
+                      onChange={(event) =>
+                        setSelectedReferredPartnerId(event.target.value)
+                      }
+                      disabled={
+                        referralDialogMode === "edit" || referralOptionsLoading
+                      }
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      <option value="">Select partner</option>
+                      {referralOptions?.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.full_name || option.email}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                ))}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="referrerPartner">Referrer</Label>
+                    <select
+                      id="referrerPartner"
+                      value={selectedReferrerId}
+                      onChange={(event) =>
+                        setSelectedReferrerId(event.target.value)
+                      }
+                      disabled={referralOptionsLoading}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      <option value={userId}>
+                        {partner.full_name || "Current Partner"}
+                      </option>
+                      {referralGroup?.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.full_name || member.email}
+                        </option>
+                      ))}
+                      <option value="none">No Referrer (Ungroup)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsReferralDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleSaveReferralRelation}
+                    disabled={saveReferralMutation.isPending}
+                  >
+                    {saveReferralMutation.isPending ? "Saving..." : "Save"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog
+              open={isMoveSubtreeDialogOpen}
+              onOpenChange={setIsMoveSubtreeDialogOpen}
+            >
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Move Referral Subtree</DialogTitle>
+                  <DialogDescription>
+                    Move one partner and all of their downstream partners under
+                    a new parent.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="subtreeRoot">Subtree Root Partner</Label>
+                    <select
+                      id="subtreeRoot"
+                      value={selectedSubtreeRootId}
+                      onChange={(event) => {
+                        const nextRootId = event.target.value;
+                        setSelectedSubtreeRootId(nextRootId);
+                        setSelectedSubtreeTargetParentId("none");
+                      }}
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      {referralGroup?.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.full_name || member.email}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="subtreeTarget">Target Parent</Label>
+                    <select
+                      id="subtreeTarget"
+                      value={selectedSubtreeTargetParentId}
+                      onChange={(event) =>
+                        setSelectedSubtreeTargetParentId(event.target.value)
+                      }
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      <option value="none">
+                        No Parent (become group root)
+                      </option>
+                      {referralOptions
+                        ?.filter((option) => {
+                          if (!selectedSubtreeRootId) {
+                            return true;
+                          }
+                          if (option.id === selectedSubtreeRootId) {
+                            return false;
+                          }
+
+                          const descendants = getDescendantIds(
+                            selectedSubtreeRootId,
+                          );
+                          return !descendants.has(option.id);
+                        })
+                        .map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.full_name || option.email}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsMoveSubtreeDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleMoveSubtree}
+                    disabled={moveSubtreeMutation.isPending}
+                  >
+                    {moveSubtreeMutation.isPending ? "Moving..." : "Move"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold">Grouped Partners</h4>
+                {referralGroupLoading ? (
+                  <div className="space-y-2">
+                    {[...Array(3)].map((_, i) => (
+                      <Skeleton key={i} className="h-12 w-full" />
+                    ))}
+                  </div>
+                ) : referralGroup && referralGroup.length > 0 ? (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {referralGroup.map((member) => (
+                      <div
+                        key={member.id}
+                        className="rounded-lg border p-3"
+                        style={{ marginLeft: `${member.depth * 16}px` }}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-medium">
+                            {member.full_name || member.email}
+                          </p>
+                          {member.is_current ? <Badge>Current</Badge> : null}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {member.email}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No referral group yet.
+                  </p>
+                )}
               </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>No referrals yet</p>
+
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold">
+                  Direct Referred Partners
+                </h4>
+                {referralsLoading ? (
+                  <div className="space-y-2">
+                    {[...Array(3)].map((_, i) => (
+                      <Skeleton key={i} className="h-12 w-full" />
+                    ))}
+                  </div>
+                ) : directReferrals && directReferrals.length > 0 ? (
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {directReferrals.map((referral) => (
+                      <div
+                        key={referral.id}
+                        className="flex items-center gap-3 rounded-lg border p-3"
+                      >
+                        <Avatar>
+                          <AvatarFallback className="bg-orange-500 text-white">
+                            {referral.full_name?.[0] || "U"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <p className="font-medium">
+                            {referral.full_name || "No Name"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {referral.email}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() =>
+                              openEditReferralDialog(
+                                referral.id,
+                                referral.referred_by,
+                              )
+                            }
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-red-500"
+                            onClick={() =>
+                              deleteReferralMutation.mutate(referral.id)
+                            }
+                            disabled={deleteReferralMutation.isPending}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Users className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>No direct referred partners yet</p>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </CardContent>
         </Card>
       </div>

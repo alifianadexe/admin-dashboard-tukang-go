@@ -10,6 +10,9 @@ export type Database = {
           phone: string | null;
           role: "client" | "mitra" | "admin";
           avatar_url: string | null;
+          referral_code: string | null;
+          referred_by: string | null;
+          service_ids: string[] | null;
           is_verified: boolean;
           is_active: boolean;
           wallet_balance: number;

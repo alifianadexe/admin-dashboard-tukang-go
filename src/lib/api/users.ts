@@ -35,6 +35,22 @@ export interface UpdatePartnerInput {
   is_verified?: boolean;
 }
 
+export interface ReferralPartner {
+  id: string;
+  full_name: string | null;
+  email: string;
+  phone: string | null;
+  is_verified: boolean;
+  created_at: string;
+  referred_by: string | null;
+  referral_code: string | null;
+}
+
+export interface ReferralGroupMember extends ReferralPartner {
+  depth: number;
+  is_current: boolean;
+}
+
 export async function getUsers(filter: UsersFilter = {}) {
   const {
     role = "all",
@@ -341,6 +357,205 @@ export async function getPartnerReferrals(userId: string) {
 
   if (error) throw error;
   return data;
+}
+
+async function getAllMitraPartners() {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(
+      "id, full_name, email, phone, is_verified, created_at, referred_by, referral_code",
+    )
+    .eq("role", "mitra");
+
+  if (error) throw error;
+  return (data ?? []) as ReferralPartner[];
+}
+
+export async function getDirectReferredPartners(userId: string) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(
+      "id, full_name, email, phone, is_verified, created_at, referred_by, referral_code",
+    )
+    .eq("role", "mitra")
+    .eq("referred_by", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as ReferralPartner[];
+}
+
+export async function getReferralPartnerOptions(currentPartnerId: string) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(
+      "id, full_name, email, phone, is_verified, created_at, referred_by, referral_code",
+    )
+    .eq("role", "mitra")
+    .neq("id", currentPartnerId)
+    .order("full_name", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as ReferralPartner[];
+}
+
+export async function getReferralGroupMembers(currentPartnerId: string) {
+  const partners = await getAllMitraPartners();
+  const byId = new Map(partners.map((partner) => [partner.id, partner]));
+
+  const currentPartner = byId.get(currentPartnerId);
+  if (!currentPartner) {
+    return [] as ReferralGroupMember[];
+  }
+
+  let rootId = currentPartnerId;
+  const seen = new Set<string>([rootId]);
+  let cursor = currentPartner.referred_by;
+
+  while (cursor) {
+    if (seen.has(cursor)) {
+      break;
+    }
+
+    const parent = byId.get(cursor);
+    if (!parent) {
+      break;
+    }
+
+    rootId = parent.id;
+    seen.add(parent.id);
+    cursor = parent.referred_by;
+  }
+
+  const childrenByParent = new Map<string, ReferralPartner[]>();
+  for (const partner of partners) {
+    if (!partner.referred_by) {
+      continue;
+    }
+
+    const siblings = childrenByParent.get(partner.referred_by) ?? [];
+    siblings.push(partner);
+    childrenByParent.set(partner.referred_by, siblings);
+  }
+
+  const result: ReferralGroupMember[] = [];
+  const queue: Array<{ partnerId: string; depth: number }> = [
+    { partnerId: rootId, depth: 0 },
+  ];
+  const visited = new Set<string>();
+
+  while (queue.length > 0) {
+    const item = queue.shift();
+    if (!item) {
+      break;
+    }
+
+    if (visited.has(item.partnerId)) {
+      continue;
+    }
+
+    const partner = byId.get(item.partnerId);
+    if (!partner) {
+      continue;
+    }
+
+    visited.add(item.partnerId);
+    result.push({
+      ...partner,
+      depth: item.depth,
+      is_current: partner.id === currentPartnerId,
+    });
+
+    const children = childrenByParent.get(item.partnerId) ?? [];
+    children.sort((a, b) =>
+      (a.full_name || a.email).localeCompare(b.full_name || b.email),
+    );
+    for (const child of children) {
+      queue.push({ partnerId: child.id, depth: item.depth + 1 });
+    }
+  }
+
+  return result;
+}
+
+export async function upsertReferralRelation(
+  referredPartnerId: string,
+  newReferrerId: string | null,
+) {
+  if (newReferrerId === referredPartnerId) {
+    throw new Error("A partner cannot refer themselves.");
+  }
+
+  const partners = await getAllMitraPartners();
+  const byId = new Map(partners.map((partner) => [partner.id, partner]));
+
+  const referredPartner = byId.get(referredPartnerId);
+  if (!referredPartner) {
+    throw new Error("Referred partner not found.");
+  }
+
+  if (newReferrerId) {
+    const newReferrer = byId.get(newReferrerId);
+    if (!newReferrer) {
+      throw new Error("Referrer partner not found.");
+    }
+
+    // Prevent cycles by ensuring the referred partner is not an ancestor of new referrer.
+    let cursor: string | null = newReferrerId;
+    const seen = new Set<string>();
+    while (cursor) {
+      if (cursor === referredPartnerId) {
+        throw new Error("This relation creates a referral cycle.");
+      }
+      if (seen.has(cursor)) {
+        break;
+      }
+
+      seen.add(cursor);
+      cursor = byId.get(cursor)?.referred_by ?? null;
+    }
+  }
+
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update({ referred_by: newReferrerId } as never)
+    .eq("id", referredPartnerId)
+    .eq("role", "mitra");
+
+  if (updateError) throw updateError;
+
+  const { error: cleanupError } = await supabase
+    .from("partner_referrals")
+    .delete()
+    .eq("referred_id", referredPartnerId);
+
+  if (cleanupError) throw cleanupError;
+
+  if (newReferrerId) {
+    const referrer = byId.get(newReferrerId);
+    if (!referrer?.referral_code) {
+      throw new Error("Referrer does not have a referral code yet.");
+    }
+
+    const status = referredPartner.is_verified ? "active" : "pending";
+    const { error: insertError } = await supabase
+      .from("partner_referrals")
+      .insert({
+        referrer_id: newReferrerId,
+        referred_id: referredPartnerId,
+        referral_code: referrer.referral_code,
+        status,
+      } as never);
+
+    if (insertError) throw insertError;
+  }
+}
+
+export async function moveReferralSubtree(
+  subtreeRootPartnerId: string,
+  newParentPartnerId: string | null,
+) {
+  await upsertReferralRelation(subtreeRootPartnerId, newParentPartnerId);
 }
 
 export async function getAllReferrals() {
