@@ -70,6 +70,24 @@ export type Database = {
           Database["public"]["Tables"]["profile_details"]["Insert"]
         >;
       };
+      indonesian_cities: {
+        Row: {
+          id: number;
+          province: string;
+          city_name: string;
+          city_type: "Kota" | "Kabupaten";
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["indonesian_cities"]["Row"],
+          "id" | "created_at" | "updated_at"
+        >;
+        Update: Partial<
+          Database["public"]["Tables"]["indonesian_cities"]["Insert"]
+        >;
+      };
       services: {
         Row: {
           id: string;
@@ -154,6 +172,8 @@ export type OrderStatus =
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type ProfileDetails =
   Database["public"]["Tables"]["profile_details"]["Row"];
+export type IndonesianCity =
+  Database["public"]["Tables"]["indonesian_cities"]["Row"];
 export type Service = Database["public"]["Tables"]["services"]["Row"];
 export type Order = Database["public"]["Tables"]["orders"]["Row"] & {
   client?: Profile;
