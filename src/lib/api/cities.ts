@@ -54,8 +54,11 @@ export async function getCityProvinces() {
   if (error) throw error;
 
   const typedRows = (data ?? []) as Array<{ province: string | null }>;
+  const isNonEmptyString = (value: string | null): value is string =>
+    typeof value === "string" && value.trim().length > 0;
+
   const provinces = Array.from(
-    new Set(typedRows.map((item) => item.province).filter(Boolean)),
+    new Set(typedRows.map((item) => item.province).filter(isNonEmptyString)),
   );
 
   return provinces;
