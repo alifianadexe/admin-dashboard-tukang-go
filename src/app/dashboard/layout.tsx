@@ -1,15 +1,16 @@
-'use client';
+"use client";
 
-import { useAuth } from '@/providers/auth-provider';
-import { useRouter, usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { useAuth } from "@/providers/auth-provider";
+import { useRouter, usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   LayoutDashboard,
   ShoppingCart,
   Users,
   UserCog,
   Wrench,
+  Store,
   DollarSign,
   Settings,
   LogOut,
@@ -17,30 +18,39 @@ import {
   X,
   ChevronDown,
   Bell,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
+} from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Orders', href: '/dashboard/orders', icon: ShoppingCart },
-  { name: 'Clients', href: '/dashboard/clients', icon: Users },
-  { name: 'Partners', href: '/dashboard/partners', icon: UserCog },
-  { name: 'Services', href: '/dashboard/services', icon: Wrench },
-  { name: 'Finance', href: '/dashboard/finance', icon: DollarSign },
-  { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Orders", href: "/dashboard/orders", icon: ShoppingCart },
+  { name: "Clients", href: "/dashboard/clients", icon: Users },
+  { name: "Partners", href: "/dashboard/partners", icon: UserCog },
+  { name: "Services", href: "/dashboard/services", icon: Wrench },
+  {
+    name: "Hardware Marketplace",
+    href: "/dashboard/hardware-marketplace",
+    icon: Store,
+  },
+  { name: "Finance", href: "/dashboard/finance", icon: DollarSign },
+  { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { user, profile, loading, signOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -48,7 +58,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     if (!loading && !user) {
-      router.replace('/login');
+      router.replace("/login");
     }
   }, [user, loading, router]);
 
@@ -72,7 +82,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const handleSignOut = async () => {
     await signOut();
-    router.push('/login');
+    router.push("/login");
   };
 
   return (
@@ -88,8 +98,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-64 transform bg-gray-900 transition-transform duration-200 lg:static lg:translate-x-0',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          "fixed inset-y-0 left-0 z-50 w-64 transform bg-gray-900 transition-transform duration-200 lg:static lg:translate-x-0",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
         <div className="flex h-full flex-col">
@@ -113,17 +123,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           {/* Navigation */}
           <nav className="flex-1 space-y-1 px-2 py-4">
-            {navigation.map(item => {
-              const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+            {navigation.map((item) => {
+              const isActive =
+                pathname === item.href || pathname.startsWith(item.href + "/");
               return (
                 <Link
                   key={item.name}
                   href={item.href}
                   className={cn(
-                    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                     isActive
-                      ? 'bg-orange-500 text-white'
-                      : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                      ? "bg-orange-500 text-white"
+                      : "text-gray-300 hover:bg-gray-800 hover:text-white",
                   )}
                   onClick={() => setSidebarOpen(false)}
                 >
@@ -139,14 +150,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="flex items-center gap-3">
               <Avatar>
                 <AvatarFallback className="bg-orange-500 text-white">
-                  {profile?.full_name?.[0] || 'A'}
+                  {profile?.full_name?.[0] || "A"}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 overflow-hidden">
                 <p className="truncate text-sm font-medium text-white">
-                  {profile?.full_name || 'Admin'}
+                  {profile?.full_name || "Admin"}
                 </p>
-                <p className="truncate text-xs text-gray-400">{profile?.email}</p>
+                <p className="truncate text-xs text-gray-400">
+                  {profile?.email}
+                </p>
               </div>
             </div>
           </div>
@@ -169,8 +182,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="hidden lg:block">
             <h1 className="text-lg font-semibold text-gray-900">
               {navigation.find(
-                item => pathname === item.href || pathname.startsWith(item.href + '/')
-              )?.name || 'Dashboard'}
+                (item) =>
+                  pathname === item.href ||
+                  pathname.startsWith(item.href + "/"),
+              )?.name || "Dashboard"}
             </h1>
           </div>
 
@@ -185,7 +200,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <Button variant="ghost" className="flex items-center gap-2">
                   <Avatar className="h-8 w-8">
                     <AvatarFallback className="bg-orange-500 text-white">
-                      {profile?.full_name?.[0] || 'A'}
+                      {profile?.full_name?.[0] || "A"}
                     </AvatarFallback>
                   </Avatar>
                   <ChevronDown className="h-4 w-4" />
@@ -197,12 +212,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <p className="text-xs text-gray-500">{profile?.email}</p>
                 </div>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => router.push('/dashboard/settings')}>
+                <DropdownMenuItem
+                  onClick={() => router.push("/dashboard/settings")}
+                >
                   <Settings className="mr-2 h-4 w-4" />
                   Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut} className="text-red-600">
+                <DropdownMenuItem
+                  onClick={handleSignOut}
+                  className="text-red-600"
+                >
                   <LogOut className="mr-2 h-4 w-4" />
                   Sign out
                 </DropdownMenuItem>

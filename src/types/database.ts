@@ -106,6 +106,35 @@ export type Database = {
         >;
         Update: Partial<Database["public"]["Tables"]["services"]["Insert"]>;
       };
+      hardware_marketplace_items: {
+        Row: {
+          id: string;
+          name: string;
+          category: string | null;
+          unit: string;
+          stock_amount: number;
+          price: number;
+          original_price: number | null;
+          discount_label: string | null;
+          description: string | null;
+          image_url: string | null;
+          store_name: string;
+          store_phone: string;
+          store_whatsapp_phone: string | null;
+          store_address: string | null;
+          is_active: boolean;
+          display_order: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["hardware_marketplace_items"]["Row"],
+          "id" | "created_at" | "updated_at"
+        >;
+        Update: Partial<
+          Database["public"]["Tables"]["hardware_marketplace_items"]["Insert"]
+        >;
+      };
       orders: {
         Row: {
           id: string;
@@ -175,6 +204,8 @@ export type ProfileDetails =
 export type IndonesianCity =
   Database["public"]["Tables"]["indonesian_cities"]["Row"];
 export type Service = Database["public"]["Tables"]["services"]["Row"];
+export type HardwareMarketplaceItem =
+  Database["public"]["Tables"]["hardware_marketplace_items"]["Row"];
 export type Order = Database["public"]["Tables"]["orders"]["Row"] & {
   client?: Profile;
   mitra?: Profile;
